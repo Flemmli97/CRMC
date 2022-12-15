@@ -1,0 +1,45 @@
+plugins {
+    id 'application'
+}
+
+version = 1.0
+// group = "io.github.flemmli97"
+// archivesBaseName = "temp"
+
+
+tasks.withType(JavaCompile) {
+    options.encoding = "UTF-8"
+    options.release = 17
+}
+
+application {
+    // Define the main class for the application.
+    mainClass = 'Classifier'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+
+    implementation 'net.sf.meka.thirdparty:mulan:1.4.0'
+    implementation 'it.unimi.dsi:fastutil:8.5.11'
+    implementation 'com.google.code.gson:gson:2.10'
+}
+
+//Optional
+jar {
+    manifest {
+        attributes([
+                "Specification-Title"     : name,
+                "Specification-Vendor"    : "flemmli97",
+                "Specification-Version"   : "1",
+                "Implementation-Title"    : name,
+                "Implementation-Version"  : version,
+                "Implementation-Vendor"   : "flemmli97",
+                "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+        ])
+    }
+}
