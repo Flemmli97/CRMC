@@ -4,7 +4,7 @@ import java.io.InputStream;
 
 public class Data {
 
-    int[] labels;
+    public Attribute[] attributes;
 
     public static Data fromStream(InputStream input) {
         return null;

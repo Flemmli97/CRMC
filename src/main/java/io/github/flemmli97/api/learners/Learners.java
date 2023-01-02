@@ -2,20 +2,26 @@ package io.github.flemmli97.api.learners;
 
 import io.github.flemmli97.Settings;
 import io.github.flemmli97.learner.Learner;
+import io.github.flemmli97.learner.RuleMultiLabelLearner;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 
 public class Learners {
 
-    private static Map<String, Function<Settings, Learner>> types = new HashMap<>();
+    private static final Map<String, Function<Settings, Learner>> TYPES = new HashMap<>();
 
     public static void registerNewLearner(String id, Function<Settings, Learner> factory) {
-        types.put(id, factory);
+        TYPES.put(id, factory);
     }
 
-    public static Function<Settings, Learner> getLearner(String id) {
-        return types.get(id);
+    public static Optional<Function<Settings, Learner>> getLearner(String id) {
+        return Optional.ofNullable(TYPES.get(id));
+    }
+
+    static {
+        registerNewLearner("RMLR", RuleMultiLabelLearner::new);
     }
 }
