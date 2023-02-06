@@ -13,6 +13,9 @@ public class Learners {
 
     private static final Map<String, Function<Settings, Learner>> TYPES = new HashMap<>();
 
+    /**
+     * Register a new learner with an id here
+     */
     public static void registerNewLearner(String id, Function<Settings, Learner> factory) {
         TYPES.put(id, factory);
     }
@@ -22,6 +25,6 @@ public class Learners {
     }
 
     static {
-        registerNewLearner("RMLR", RuleMultiLabelLearner::new);
+        registerNewLearner("RLCM", RuleMultiLabelLearner::new);
     }
 }

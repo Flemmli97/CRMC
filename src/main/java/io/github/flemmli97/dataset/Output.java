@@ -5,15 +5,37 @@ import weka.core.Instance;
 import weka.core.Utils;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class Output {
 
-    int dataID;
+    public final int dataID;
 
-    int[] labels;
+    public final int[] labels;
 
-    Instance dataInstance;
+    public final Instance dataInstance;
+
+    public Output(int dataID, int[] labels, Instance dataInstance) {
+        this.dataID = dataID;
+        this.labels = labels;
+        Arrays.sort(this.labels);
+        this.dataInstance = dataInstance;
+    }
+
+    public String labelsSimple() {
+        StringBuilder builder = new StringBuilder();
+        builder.append("{");
+        int i = 0;
+        for (int label : this.labels) {
+            if (i != 0)
+                builder.append(",");
+            builder.append(label).append(" ").append(1);
+            i++;
+        }
+        builder.append("}");
+        return builder.toString();
+    }
 
     public List<String> formattedLabels() {
         List<String> formatted = new ArrayList<>();

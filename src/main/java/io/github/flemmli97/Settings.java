@@ -1,5 +1,8 @@
 package io.github.flemmli97;
 
+/**
+ * Settings holder for various learner
+ */
 public class Settings {
 
     int maxRules;

@@ -15,7 +15,11 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class LabelledSet extends UnlabelledSet {
 
@@ -29,7 +33,19 @@ public class LabelledSet extends UnlabelledSet {
      */
     public int[][] dataLabels;
 
+    /**
+     * Array of labels matched to their data
+     */
+    public int[][] labelData;
+
+    /**
+     * Map of features to data instances
+     */
     public double[][] dataFeatures;
+
+    //public Map<Feature,List of pair:data instance, feature val>
+
+    public Set<Attribute>[] dataFeaturess;
 
     /**
      * Creates a new labelled dataset from a given path
@@ -52,7 +68,7 @@ public class LabelledSet extends UnlabelledSet {
     }
 
     /**
-     * Creates a new labelled dataset from a given path and an xml file using the mulan data format
+     * Creates a new labelled dataset from a given path and a xml file using the mulan data format
      *
      * @param path    The path to the arff file
      * @param xmlFile The xml file defining the labels for the arff file
@@ -66,6 +82,7 @@ public class LabelledSet extends UnlabelledSet {
             e.printStackTrace();
             throw new RuntimeException();
         }
+        //TODO label dependency?
         NodeList labelsNode = xml.getDocumentElement().getElementsByTagName("label");
         this.labels = new int[labelsNode.getLength()];
         for (int i = 0; i < labelsNode.getLength(); i++) {
@@ -78,36 +95,63 @@ public class LabelledSet extends UnlabelledSet {
         this.setupLabels();
     }
 
-    private void setupLabels() {
-        this.dataLabels = new int[this.insts.numInstances()][];
-        this.dataFeatures = new double[this.insts.numInstances()][];
-        for (int i = 0; i < this.insts.size(); i++) {
-            Instance inst = this.insts.get(i);
-            List<Integer> l = new ArrayList<>();
-            List<Double> f = new ArrayList<>();
-            boolean b = false;
-            for (int label : this.labels) {
-                Attribute att = inst.attribute(label);
-                for (int vals = 0; vals < inst.numValues(); vals++) {
-                    boolean isNull = (att.isString() || att.isRelationValued() || inst.value(label) != 0);
-                    int attI = inst.index(vals);
-                    if (attI == label && isNull)
-                        l.add(label);
-                    if (!b)
-                        f.add(inst.value(attI));
-                }
-                b = true;
-            }
-            this.dataLabels[i] = l.stream().mapToInt(Integer::intValue).toArray();
-            this.dataFeatures[i] = f.stream().mapToDouble(Double::doubleValue).toArray();
-            i++;
-        }
-    }
-
     public static Document parseXML(Path path) throws IOException, ParserConfigurationException, SAXException {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         try (InputStream input = Files.newInputStream(path)) {
             return factory.newDocumentBuilder().parse(input);
         }
+    }
+
+    private void setupLabels() {
+        this.dataLabels = new int[this.insts.numInstances()][];
+        this.dataFeatures = new double[this.insts.numInstances()][];
+        Map<Integer, List<Integer>> labelData = new HashMap<>();
+        for (int dataIndex = 0; dataIndex < this.insts.size(); dataIndex++) {
+            Instance inst = this.insts.get(dataIndex);
+            List<Integer> l = new ArrayList<>();
+            List<Double> f = new ArrayList<>();
+            boolean b = false;
+            for (int labelIndex = 0; labelIndex < this.labels.length; labelIndex++) {
+                int label = this.labels[labelIndex];
+                Attribute att = inst.attribute(label);
+                for (int vals = 0; vals < inst.numValues(); vals++) {
+                    boolean has = (att.isString() || att.isRelationValued() || inst.value(label) != 0);
+                    int attI = inst.index(vals);
+                    if (attI == label && has) {
+                        l.add(label);
+                        labelData.computeIfAbsent(labelIndex, key -> new ArrayList<>())
+                                .add(dataIndex);
+                    }
+                    if (!b)
+                        f.add(inst.value(attI));
+                }
+                b = true;
+            }
+            this.dataLabels[dataIndex] = l.stream().mapToInt(Integer::intValue).toArray();
+            this.dataFeatures[dataIndex] = f.stream().mapToDouble(Double::doubleValue).toArray();
+        }
+        this.labelData = labelData.entrySet().stream()
+                .sorted(Comparator.comparingInt(Map.Entry::getKey))
+                .map(e -> e.getValue().stream().mapToInt(Integer::intValue).toArray())
+                .toArray(int[][]::new);
+    }
+
+    /**
+     * @return Get the labels associated with this dataset in readable form
+     */
+    public String labels() {
+        StringBuilder builder = new StringBuilder();
+        builder.append("Labels:[");
+        boolean start = true;
+        for (int label : this.labels) {
+            Attribute att = this.insts.attribute(label);
+            if (!start) {
+                builder.append(", ");
+            }
+            start = false;
+            builder.append(att.name());
+        }
+        builder.append("]");
+        return builder.toString();
     }
 }

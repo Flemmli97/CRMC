@@ -1,8 +1,8 @@
 package io.github.flemmli97.learner;
 
-import io.github.flemmli97.dataset.Data;
 import io.github.flemmli97.dataset.LabelledSet;
 import io.github.flemmli97.dataset.Output;
+import io.github.flemmli97.dataset.UnlabelledSet;
 
 public interface Learner {
 
@@ -15,10 +15,11 @@ public interface Learner {
 
     /**
      * Predict the labels of the given data using this learner
+     * TODO: turn to list like. as atm its single output
      *
      * @param data
      * @return
      */
-    Output predict(Data data);
+    Output predict(UnlabelledSet data);
 
 }

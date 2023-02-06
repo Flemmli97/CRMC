@@ -14,7 +14,7 @@ tasks.withType(JavaCompile) {
 
 application {
     // Define the main class for the application.
-    mainClass = 'io.github.flemmli97.Classifier'
+    mainClass = 'io.github.flemmli97.MultiLabelClassifier'
 }
 
 repositories {
