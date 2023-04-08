@@ -5,17 +5,23 @@ package io.github.flemmli97;
  */
 public class Settings {
 
-    int maxRules;
+    public int maxRules;
 
-    boolean multiThreaded;
+    public int threadCount = 1;
+    public double confidenceP = 0.6;
 
     public Settings withMaxRules(int maxRules) {
         this.maxRules = maxRules;
         return this;
     }
 
-    public Settings useMultithreading() {
-        this.multiThreaded = true;
+    public Settings threadCount(int threadCount) {
+        this.threadCount = threadCount;
+        return this;
+    }
+
+    public Settings withConfidenceP(float confidenceP) {
+        this.confidenceP = confidenceP;
         return this;
     }
 }

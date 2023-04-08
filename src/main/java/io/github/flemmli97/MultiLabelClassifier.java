@@ -1,11 +1,23 @@
 package io.github.flemmli97;
 
+import io.github.flemmli97.api.learners.Learners;
 import io.github.flemmli97.dataset.LabelledSet;
+import io.github.flemmli97.dataset.Output;
+import io.github.flemmli97.dataset.UnlabelledSet;
+import io.github.flemmli97.learner.Learner;
+import mulan.classifier.MultiLabelOutput;
+import mulan.classifier.transformation.BinaryRelevance;
+import mulan.data.MultiLabelInstances;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
+import weka.classifiers.rules.JRip;
+import weka.core.Instance;
 
 import java.nio.file.Path;
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class MultiLabelClassifier {
 
@@ -28,46 +40,49 @@ public class MultiLabelClassifier {
         String learnerID = "RLCM";
         Settings settings = new Settings();
 
-        //Learner learner = Learners.getLearner(learnerID)
-        //        .orElseThrow(() -> new RuntimeException("No such learner " + learnerID))
-        //        .apply(settings);
+        Learner learner = Learners.getLearner(learnerID)
+                .orElseThrow(() -> new RuntimeException("No such learner " + learnerID))
+                .apply(settings);
 
-        //learner.learn(set2);
+        learner.learn(set2);
 
-        //System.out.println(set2.insts.size());
-        //System.out.println(set2.dataLabels.length);
+        Output o = learner.predict(set2);
+        //for (List<String> l : o.instanceLabelsReadable)
+        //    System.out.println(l);
+        System.out.println(o.confusionMatrix.accuracy());
+        System.out.println(o.confusionMatrix.precision());
+        System.out.println(o.confusionMatrix.recall());
+        System.out.println(o.confusionMatrix.f1());
+        System.out.println(o.confusionMatrix.MCC());
 
-        System.out.println(set2.labels());
-
-        System.out.println(Arrays.toString(set2.labels));
-        System.out.println(Arrays.deepToString(set2.dataLabels));
-        System.out.println(Arrays.deepToString(set2.labelData));
-
-        for (int labelIndex = 0; labelIndex < set2.labelData.length; labelIndex++) {
-            int[] data = set2.labelData[labelIndex];
-            for (int dataIndex : data) {
-                boolean contains = false;
-                for (int label : set2.dataLabels[dataIndex]) {
-                    if (label == set2.labels[labelIndex])
-                        contains = true;
+        BinaryRelevance r = new BinaryRelevance(new JRip());
+        try {
+            r.build(new MultiLabelInstances("./data/CAL500.arff", "./data/CAL500.xml"));
+            MultiLabelInstances mI = new MultiLabelInstances("./data/CAL500.arff", "./data/CAL500.xml");
+            Map<Integer, List<Integer>> result = new HashMap<>();
+            int i = 0;
+            for (Instance inst : mI.getDataSet()) {
+                MultiLabelOutput multiLabelOutput = r.makePrediction(inst);
+                List<Integer> l = new ArrayList<>();
+                for (int li = 0; li < multiLabelOutput.getBipartition().length; li++) {
+                    boolean b = multiLabelOutput.getBipartition()[li];
+                    if (b)
+                        l.add(set2.labels[li]);
                 }
-                if (!contains)
-                    System.out.println("WRONG for " + labelIndex);
+                result.computeIfAbsent(i, old -> new ArrayList<>())
+                        .addAll(l);
+                i++;
             }
+            Output out = new Output(new UnlabelledSet(mI.getDataSet()), set2.labels, result);
+            System.out.println("=======");
+            System.out.println(out.confusionMatrix.accuracy());
+            System.out.println(out.confusionMatrix.precision());
+            System.out.println(out.confusionMatrix.recall());
+            System.out.println(out.confusionMatrix.f1());
+            System.out.println(out.confusionMatrix.MCC());
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-        //System.out.println(Arrays.deepToString(set2.dataFeatures));
-        //System.out.println(Arrays.toString(set2.labels));
-
-        //System.out.println(learner);
-        //System.out.println("INST============\n" +set2.insts);
-        //System.out.println(Arrays.toString(set2.labels));
-        //System.out.println(Arrays.deepToString(set2.dataLabels));
-        //-- train learning instance from labelled instance
-
-        //--Create unlabelled instance
-
-        //--Tests: predict for unlabelled instances
-
     }
 
     public static void main(Option option) {

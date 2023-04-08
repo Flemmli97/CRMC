@@ -22,4 +22,8 @@ public class UnlabelledSet {
             throw new RuntimeException();
         }
     }
+
+    public UnlabelledSet(Instances instances) {
+        this.insts = instances;
+    }
 }

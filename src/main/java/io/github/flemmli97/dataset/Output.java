@@ -1,55 +1,68 @@
 package io.github.flemmli97.dataset;
 
+import io.github.flemmli97.measure.ConfusionMatrix;
 import weka.core.Attribute;
 import weka.core.Instance;
 import weka.core.Utils;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 public class Output {
 
-    public final int dataID;
+    public final UnlabelledSet dataSet;
 
     public final int[] labels;
 
-    public final Instance dataInstance;
+    public final Map<Integer, List<Integer>> result;
 
-    public Output(int dataID, int[] labels, Instance dataInstance) {
-        this.dataID = dataID;
+    public final List<List<String>> instanceLabelsReadable;
+
+    public final ConfusionMatrix confusionMatrix;
+
+    public Output(UnlabelledSet dataSet, int[] labels, Map<Integer, List<Integer>> result) {
+        this.dataSet = dataSet;
         this.labels = labels;
-        Arrays.sort(this.labels);
-        this.dataInstance = dataInstance;
+        this.result = result;
+        this.confusionMatrix = new ConfusionMatrix();
+        this.instanceLabelsReadable = result.entrySet().stream().sorted(Map.Entry.comparingByKey()).map(e -> {
+            Instance inst = dataSet.insts.get(e.getKey());
+            return this.process(inst, this.confusionMatrix, e.getValue());
+        }).toList();
     }
 
-    public String labelsSimple() {
-        StringBuilder builder = new StringBuilder();
-        builder.append("{");
-        int i = 0;
-        for (int label : this.labels) {
-            if (i != 0)
-                builder.append(",");
-            builder.append(label).append(" ").append(1);
-            i++;
-        }
-        builder.append("}");
-        return builder.toString();
-    }
-
-    public List<String> formattedLabels() {
+    private List<String> process(Instance inst, ConfusionMatrix matrix, List<Integer> labels) {
         List<String> formatted = new ArrayList<>();
         for (int i : this.labels) {
-            Attribute att = this.dataInstance.attribute(i);
-            double value = this.dataInstance.value(att.index());
-            if (att.isString() || att.isNominal()) {
-                formatted.add(att.name() + "=" + att.value((int) value));
-            } else if (att.isRelationValued()) {
-                formatted.add(att.name() + "=" + att.relation((int) value).relationName());
-            } else if (att.isDate()) {
-                formatted.add(att.name() + "=" + att.formatDate(value));
+            Attribute att = inst.attribute(i);
+            double value = inst.value(att.index());
+            String eq;
+            if (labels.contains(i)) {
+                if (value == 1) {
+                    matrix.increaseTruePositive();
+                    eq = "=";
+                } else {
+                    matrix.increaseFalsePositive();
+                    eq = "!=";
+                }
             } else {
-                formatted.add(att.name() + "=" + Utils.doubleToString(value, 2));
+                if (value != 1) {
+                    matrix.increaseTrueNegative();
+                    eq = "=";
+                } else {
+                    matrix.increaseFalseNegative();
+                    eq = "!=";
+                }
+            }
+            if (att.isString() || att.isNominal()) {
+                formatted.add(att.name() + eq + att.value((int) value));
+            } else if (att.isRelationValued()) {
+                formatted.add(att.name() + eq + att.relation((int) value).relationName());
+            } else if (att.isDate()) {
+                formatted.add(att.name() + eq + att.formatDate(value));
+            } else {
+                formatted.add(att.name() + eq + Utils.doubleToString(value, 2));
             }
         }
         return formatted;
