@@ -5,12 +5,16 @@ import io.github.flemmli97.dataset.LabelledSet;
 import io.github.flemmli97.dataset.Output;
 import io.github.flemmli97.dataset.UnlabelledSet;
 import io.github.flemmli97.learner.Learner;
+import io.github.flemmli97.learner.RuleMultiLabelLearner;
+import io.github.flemmli97.plots.PlotVisualizer;
 import mulan.classifier.MultiLabelOutput;
 import mulan.classifier.transformation.BinaryRelevance;
 import mulan.data.MultiLabelInstances;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
+import weka.classifiers.rules.DecisionTable;
 import weka.classifiers.rules.JRip;
+import weka.classifiers.rules.OneR;
 import weka.core.Instance;
 
 import java.nio.file.Path;
@@ -46,16 +50,23 @@ public class MultiLabelClassifier {
 
         learner.learn(set2);
 
-        Output o = learner.predict(set2);
-        //for (List<String> l : o.instanceLabelsReadable)
-        //    System.out.println(l);
-        System.out.println(o.confusionMatrix.accuracy());
-        System.out.println(o.confusionMatrix.precision());
-        System.out.println(o.confusionMatrix.recall());
-        System.out.println(o.confusionMatrix.f1());
-        System.out.println(o.confusionMatrix.MCC());
+        ArrayList<PlotVisualizer.PlotPair> res = new ArrayList<>();
 
-        BinaryRelevance r = new BinaryRelevance(new JRip());
+        for(double d = 0; d < 1; d+=0.05) {
+            ((RuleMultiLabelLearner)learner).setThreshold(d);
+            Output o = learner.predict(set2);
+            res.add(new PlotVisualizer.PlotPair(d, o));
+            //for (List<String> l : o.instanceLabelsReadable)
+            //    System.out.println(l);
+            /*System.out.println(o.confusionMatrix.accuracy());
+            System.out.println(o.confusionMatrix.precision());
+            System.out.println(o.confusionMatrix.recall());
+            System.out.println(o.confusionMatrix.f1());
+            System.out.println(o.confusionMatrix.MCC());*/
+        }
+        PlotVisualizer.plotF1(res);
+
+        BinaryRelevance r = new BinaryRelevance(new DecisionTable());
         try {
             r.build(new MultiLabelInstances("./data/CAL500.arff", "./data/CAL500.xml"));
             MultiLabelInstances mI = new MultiLabelInstances("./data/CAL500.arff", "./data/CAL500.xml");

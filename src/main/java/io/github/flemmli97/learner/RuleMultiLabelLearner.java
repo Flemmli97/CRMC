@@ -56,6 +56,14 @@ public class RuleMultiLabelLearner implements Learner {
         this.pConfidence = settings.confidenceP;
     }
 
+    public double threshold() {
+        return this.pConfidence;
+    }
+
+    public void setThreshold(double val) {
+        this.pConfidence = val;
+    }
+
     @Override
     public void learn(LabelledSet set) {
         this.clss = new Classifier[set.labels.length];
@@ -95,7 +103,7 @@ public class RuleMultiLabelLearner implements Learner {
                 e.printStackTrace();
             }
             int size = copy.size();
-            clss[ci] = ripper;
+            this.clss[ci] = ripper;
             ArrayList<double[]> dist = ReflectionUtil.getField(ripper, "m_Distributions");
             this.rules[ci] = ripper.getRuleset().toArray(Rule[]::new);
             this.distributions[ci] = dist.toArray(double[][]::new);
@@ -177,7 +185,7 @@ public class RuleMultiLabelLearner implements Learner {
         StringBuilder builder = new StringBuilder();
         builder.append("Rule based Multilabel Learner");
         builder.append("Rules:");
-        builder.append(getRules());
+        builder.append(this.getRules());
         return builder.toString();
     }
 
