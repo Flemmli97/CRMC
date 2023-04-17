@@ -10,6 +10,9 @@ public class Settings {
     public int threadCount = 1;
     public double confidenceP = 0.6;
 
+    public boolean conformal = true;
+    public boolean log;
+
     public Settings withMaxRules(int maxRules) {
         this.maxRules = maxRules;
         return this;
@@ -22,6 +25,16 @@ public class Settings {
 
     public Settings withConfidenceP(float confidenceP) {
         this.confidenceP = confidenceP;
+        return this;
+    }
+
+    public Settings withoutConformal() {
+        this.conformal = false;
+        return this;
+    }
+
+    public Settings log() {
+        this.log = true;
         return this;
     }
 }

@@ -25,6 +25,6 @@ public class Learners {
     }
 
     static {
-        registerNewLearner("RLCM", RuleMultiLabelLearner::new);
+        registerNewLearner("RMLC", RuleMultiLabelLearner::new);
     }
 }
