@@ -5,6 +5,9 @@ import weka.classifiers.Classifier;
 import weka.core.Instance;
 import weka.core.Instances;
 
+/**
+ * Unused
+ */
 public interface Conformal {
 
     //Score

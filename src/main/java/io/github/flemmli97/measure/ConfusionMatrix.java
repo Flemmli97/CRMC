@@ -21,19 +21,19 @@ public class ConfusionMatrix {
     }
 
     public int getTruePositive() {
-        return truePositive;
+        return this.truePositive;
     }
 
     public int getTrueNegative() {
-        return trueNegative;
+        return this.trueNegative;
     }
 
     public int getFalsePositive() {
-        return falsePositive;
+        return this.falsePositive;
     }
 
     public int getFalseNegative() {
-        return falseNegative;
+        return this.falseNegative;
     }
 
     public double accuracy() {

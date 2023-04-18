@@ -38,6 +38,7 @@ public class MultiLabelClassifier {
         options.addOption("rules", false, "If set prints the rules");
         options.addOption("nonconformal", false, "Disable conformal prediction");
         options.addOption("log", false, "Logging things. WIP");
+        options.addOption("t", true, "threshold");
 
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
@@ -80,6 +81,10 @@ public class MultiLabelClassifier {
         if (cmd.hasOption("-log"))
             settings.log();
 
+        if (cmd.hasOption("t")) {
+            settings.withConfidenceP(Float.parseFloat(cmd.getOptionValue("t")));
+        }
+
         runLearner(classifier, settings, set, test, cmd.hasOption("-rules"), cmd.hasOption("-plot"));
     }
 
@@ -95,19 +100,33 @@ public class MultiLabelClassifier {
             System.out.println(((RuleMultiLabelLearner) learner).getRules());
         if (plot) {
             ArrayList<Pair<Double, Output>> res = new ArrayList<>();
-            for (double d = 0; d < 1; d += 0.025) {
+            for (double d = 0; d < 1.5; d += 0.025) {
                 ((RuleMultiLabelLearner) learner).setThreshold(d); //Currently only this impl so its fine
                 Output o = learner.predict(test);
                 res.add(new Pair<>(d, o));
+                System.out.println("FALSE Loss: " + o.confusionMatrix.getFalsePositive());
+                System.out.println("FALSE NEG: " + o.confusionMatrix.getFalseNegative());
             }
             PlotVisualizer.plotF1(res);
+            PlotVisualizer.plot(res, "Hamming-Loss", "Hamming-Loss", Output::hammingLoss);
         } else {
             Output o = learner.predict(test);
-            System.out.println("Accuracy: " + o.confusionMatrix.accuracy());
+            System.out.println("Micro Accuracy: " + o.confusionMatrix.accuracy());
+            System.out.println("Macro Accuracy: " + o.confusionMatrix.macroAccuracy());
             System.out.println("Precision: " + o.confusionMatrix.precision());
+            System.out.println("Macro Precision: " + o.confusionMatrix.macroPrecision());
             System.out.println("Recall: " + o.confusionMatrix.recall());
+            System.out.println("Macro Recall: " + o.confusionMatrix.macroRecall());
             System.out.println("F1: " + o.confusionMatrix.f1());
+            System.out.println("Macro F1: " + o.confusionMatrix.macroF1());
             System.out.println("MCC: " + o.confusionMatrix.MCC());
+            System.out.println("Hamming Loss: " + o.hammingLoss());
+            System.out.println("AMOUT: " + (o.dataSet.insts.size() * o.labels.length));
+            System.out.println("FALSE Pos: " + o.confusionMatrix.getFalsePositive());
+            System.out.println("FALSE NEG: " + o.confusionMatrix.getFalseNegative());
+            //System.out.println("=======Labels: ");
+            //for(Pair<Integer, List<String>> val : o.instanceLabelsReadable)
+            //    System.out.println(val);
         }
     }
 
@@ -133,7 +152,7 @@ public class MultiLabelClassifier {
                         .addAll(l);
                 i++;
             }
-            Output out = new Output(new UnlabelledSet(mI.getDataSet()), set.labels, result);
+            Output out = new Output(new UnlabelledSet(mI.getDataSet()), set.labels, result, true);
             System.out.println("=======");
             System.out.println(out.confusionMatrix.accuracy());
             System.out.println(out.confusionMatrix.precision());
