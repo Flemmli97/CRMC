@@ -11,7 +11,6 @@ import weka.classifiers.rules.JRip;
 import weka.classifiers.rules.Rule;
 import weka.classifiers.rules.RuleStats;
 import weka.core.Attribute;
-import weka.core.EuclideanDistance;
 import weka.core.Instance;
 import weka.core.Instances;
 import weka.filters.Filter;
@@ -39,14 +38,10 @@ public class RuleMultiLabelLearner implements Learner {
     private double[][][] distributions;
 
     private Rule[][] rules;
-    private double[][] ruleScores;
+    private RuleStats[][] ruleStats;
     private double[][][] instanceScores;
 
-    private double[][][] ruleData;
-    private double[][][] ruleScores2;
-
     private Instances[] training;
-    private Instances[] test;
 
     private final InstanceTransformer instanceTransformer = (insts, originLabels, label) -> {
         Remove attRemover = new Remove();
@@ -87,30 +82,19 @@ public class RuleMultiLabelLearner implements Learner {
         this.classifiers = new Classifier[this.labels.length];
         this.distributions = new double[this.classifiers.length][][];
         this.rules = new Rule[this.classifiers.length][];
-        this.ruleScores = new double[this.classifiers.length][];
+        this.ruleStats = new RuleStats[this.classifiers.length][];
         this.instanceScores = new double[this.classifiers.length][][];
-
-        this.ruleData = new double[this.classifiers.length][][];
-        this.ruleScores2 = new double[this.classifiers.length][][];
-
         this.training = new Instances[set.labels.length];
-        this.test = new Instances[set.labels.length];
         for (int labelIndex = 0; labelIndex < this.labels.length; labelIndex++) {
             int label = this.labels[labelIndex];
             //Init classifier
             JRip ripper = new JRip();
             ripper.setUsePruning(this.pruning);
-            //5-Hold-out split
-            int split = 400;//set.insts.size();// - set.insts.size() / 5;
-            Instances train = new Instances(set.insts, 0, split);
-            int testSize = set.insts.size() - split;
-            Instances test = new Instances(set.insts, split, testSize);
+            Instances train = new Instances(set.insts);
             try {
                 //Remove all labels except the current relevant one
                 train.setClassIndex(label);
                 train = this.instanceTransformer.of(train, set.labels, label);
-                test.setClassIndex(label);
-                test = this.instanceTransformer.of(test, set.labels, label);
                 // JRIP rule learning
                 ripper.buildClassifier(train);
             } catch (Exception e) {
@@ -121,33 +105,21 @@ public class RuleMultiLabelLearner implements Learner {
             this.distributions[labelIndex] = dist.toArray(double[][]::new);
             this.rules[labelIndex] = ripper.getRuleset().toArray(Rule[]::new);
             this.training[labelIndex] = train;
-            this.test[labelIndex] = test;
             //CP setup
             if (this.applyConformal) {
-                Attribute classAttribute = ReflectionUtil.getField(ripper, "m_Class");
                 List<RuleStats> stats = ReflectionUtil.getField(ripper, "m_RulesetStats");
-                double[] scores = new double[ripper.getRuleset().size()];
-                int iS = 0;
-                for (RuleStats stat : stats) {
-                    for (int iR = 0; iR < stat.getRulesetSize(); iR++) {
-                        double score = stat.getSimpleStats(iR)[2] / (stat.getSimpleStats(iR)[0]) - Math.sqrt(1f / (stat.getSimpleStats(iR)[0]));
-                        scores[iS] = score;
-                        iS++;
-                    }
-                }
-                this.ruleScores[labelIndex] = scores;
-                int tempLabel = labelIndex;
-                Instances finalTrain = train;
+                this.ruleStats[labelIndex] = stats.toArray(new RuleStats[0]);
+                //Calculate conformity scores of instances
                 List<Double> pos = new ArrayList<>();
                 List<Double> neg = new ArrayList<>();
-                train.stream().forEach(i -> {
-                    double[] conf = this.conformity(finalTrain, i, stats, tempLabel, classAttribute);
-                    if(i.classValue() == 0)
+                for (Instance trainingInstance : train) {
+                    double[] conf = this.conformity(train, trainingInstance, stats, labelIndex);
+                    if (trainingInstance.classValue() == 0)
                         neg.add(conf[0]);
-                    if(i.classValue() == 1)
+                    if (trainingInstance.classValue() == 1)
                         pos.add(conf[1]);
-                });
-                this.instanceScores[labelIndex] = new double[][] {neg.stream().mapToDouble(d->d).toArray(), pos.stream().mapToDouble(d->d).toArray()};
+                }
+                this.instanceScores[labelIndex] = new double[][]{neg.stream().mapToDouble(d -> d).toArray(), pos.stream().mapToDouble(d -> d).toArray()};
                 //This is what JRIP uses
                 /*List<double[][]> ripperDefaultDistribution = stats.stream().map(s->{
                     double[][] d = new double[s.getRulesetSize()][];
@@ -223,16 +195,16 @@ public class RuleMultiLabelLearner implements Learner {
                         p -> new double[][]{p.first().stream().mapToDouble(f -> f).toArray(), p.second().stream().mapToDouble(f -> f).toArray()}));
                 */
                 if (this.log)
-                    System.out.println("Rule-scores " + Arrays.toString(this.ruleScores2[labelIndex]));
+                    System.out.println("Rule-scores " + Arrays.toString(this.ruleStats[labelIndex]));
             }
         }
         this.learned = true;
     }
 
-    private double dot(double[] arr, double[] arr2, int c) {
+    private double dot(double[] arr, double[] arr2, int ignore) {
         double sum = 0;
         for (int i = 0; i < arr.length; i++) {
-            if(i == c)
+            if (i == ignore)
                 continue;
             sum += arr[i] * arr2[i];
         }
@@ -246,42 +218,34 @@ public class RuleMultiLabelLearner implements Learner {
         }
         return sub;
     }
-//neg, pos
-    private double[] conformity(Instances instances, Instance instance, List<RuleStats> stats, int labelIndex, Attribute label) {
-        double instLabel = instance.value(instance.classIndex());
-        EuclideanDistance distance = new EuclideanDistance();
-        distance.setInstances(instances);
-        List<Instance> l = new ArrayList<>(instances);
-        List<Pair<Double, Instance>> ll = l.stream().map(i->{
-            var c = i.classIndex();
+
+    private double[] conformity(Instances instances, Instance instance, List<RuleStats> stats, int labelIndex) {
+        List<Pair<Double, Instance>> sorted = new ArrayList<>(instances).stream().map(i -> {
             double[] s = this.sub(instance.toDoubleArray(), i.toDoubleArray());
-            var d = this.dot(s, s, c);
-            return new Pair<>(Math.sqrt(this.dot(s, s, c)), i);
-        }).toList();
-        List<Pair<Double, Instance>> lll  = ll.stream().sorted(Comparator.comparing(Pair::first)).toList();
-        var dd = instances.stream().map(i-> {
-            double[] s = this.sub(instance.toDoubleArray(), i.toDoubleArray());
-            return Math.sqrt(this.dot(s, s, i.classIndex()));
-        }).toList();
-        double maxP = Double.MIN_VALUE;
-        double maxN = Double.MIN_VALUE;
+            return new Pair<>(Math.sqrt(this.dot(s, s, i.classIndex())), i);
+        }).sorted(Comparator.comparing(Pair::first)).toList();
         int pos = 0;
         int neg = 0;
         List<Double> mP = new ArrayList<>();
         List<Double> mN = new ArrayList<>();
-        for(Pair<Double, Instance> ii : lll) {
-            if(ii.second() == instance)
+        for (Pair<Double, Instance> ii : sorted) {
+            if (ii.second() == instance)
                 continue;
-            //if (rule.covers(ii)) {
-            double ruleOutput = ii.second().classValue();//Double.parseDouble(label.value((int) rule.getConsequent()));
-            if(ruleOutput ==1)
-                pos++;
-            else
-                neg++;
-            int n = pos + neg;
-            mP.add((double) pos / n - Math.sqrt(1f / n));
-            mN.add((double) neg / n - Math.sqrt(1f / n));
-            //}
+            for (RuleStats stat : stats) {
+                for (int iR = 0; iR < stat.getRulesetSize(); iR++) {
+                    Rule rule = stat.getRuleset().get(iR);
+                    if (rule.covers(ii.second())) {
+                        double labelVal = ii.second().classValue();
+                        if (labelVal == 1)
+                            pos++;
+                        else
+                            neg++;
+                        int n = pos + neg;
+                        mP.add((double) pos / n - Math.sqrt(1f / n));
+                        mN.add((double) neg / n - Math.sqrt(1f / n));
+                    }
+                }
+            }
         }
         /*for (RuleStats stat : stats) {
             for (int iR = 0; iR < stat.getRulesetSize(); iR++) {
@@ -332,32 +296,18 @@ public class RuleMultiLabelLearner implements Learner {
                     maxN = ruleQuality;
             }
         }*/
-        var ret = new double[]{mN.stream().mapToDouble(d->d).limit(mN.size() / 2).max().orElse(0),
-                mP.stream().mapToDouble(d->d).limit(mP.size() / 2).max().orElse(0)};
-        return ret;
-    }
-
-    private double conformity(Instance instance, double labelVal, int labelIndex, Attribute label) {
-
-        Rule[] rules = this.rules[labelIndex];
-        double max = Double.MIN_VALUE;
-        for (int i = 0; i < rules.length; i++) {
-            Rule rule = rules[i];
-            double ruleQuality = this.ruleScores[labelIndex][i];
-            if (rule.covers(instance) && Double.parseDouble(label.value((int) rule.getConsequent())) == labelVal && ruleQuality > max)
-                max = ruleQuality;
-        }
-        return max;
+        return new double[]{mN.stream().mapToDouble(d -> d).limit(mN.size() / 2).max().orElse(0),
+                mP.stream().mapToDouble(d -> d).limit(mP.size() / 2).max().orElse(0)};
     }
 
     private double[] plausibility(Instances instances, Instance instance, List<RuleStats> stats, int labelIndex, Attribute label) {
-        double[] conform = this.conformity(instances, instance, stats, labelIndex, label);
+        double[] conform = this.conformity(instances, instance, stats, labelIndex);
         double[][] instsScores = this.instanceScores[labelIndex];
-        double cP = Arrays.stream(instsScores[1]).filter(d->conform[1] >= d).count();
-        double cN = Arrays.stream(instsScores[0]).filter(d->conform[0] >= d).count();
+        double cP = Arrays.stream(instsScores[1]).filter(d -> conform[1] >= d).count();
+        double cN = Arrays.stream(instsScores[0]).filter(d -> conform[0] >= d).count();
         double pPos = cP / (double) instsScores[1].length;
-        double pNeg =  cN / (double) instsScores[0].length;
-        return new double[] {pNeg, pPos};
+        double pNeg = cN / (double) instsScores[0].length;
+        return new double[]{pNeg, pPos};
     }
 
     @Override
@@ -375,56 +325,13 @@ public class RuleMultiLabelLearner implements Learner {
                 e.printStackTrace();
             }
             Attribute classAttribute = ReflectionUtil.getField(this.classifiers[labelIndex], "m_Class");
-            /*Attribute classAttribute = ReflectionUtil.getField(this.classifiers[labelIndex], "m_Class");
-                Pair<ArrayList<Instance>, ArrayList<Instance>> mappedInsts = this.training[labelIndex].stream()
-                        .collect(() -> new Pair<>(new ArrayList<>(), new ArrayList<>()), (i, inst) -> {
-                            if (inst.value(inst.classIndex()) == 0)
-                                i.first().add(inst);
-                            else
-                                i.second().add(inst);
-                        }, (i, i2) -> {
-                        });*/
-            double[][] instScores = this.instanceScores[labelIndex];
             List<Double> pos = new ArrayList<>();
             List<Double> neg = new ArrayList<>();
-
             for (int instInd = 0; instInd < instances.size(); instInd++) {
                 Instance inst = instances.get(instInd);
                 double[] distribution;
                 if (this.applyConformal) {
-                        /*double[] scoreP = this.scoreFor(inst, labelIndex, classAttribute, 1);
-                        double[] scoreN = this.scoreFor(inst, labelIndex, classAttribute, 0);
-                        double countP = 0;
-                        double countN = 0;
-                        int countPN = 0;
-                        int countNN = 0;
-                        for (int i = 0; i < this.training[labelIndex].size(); i++) {
-                            Instance t = this.training[labelIndex].get(i);
-                            double val = t.value(t.classIndex());
-                            if (val == 1) {
-                                double conformP = 0;//TODO
-                                countPN++;
-                                if (scoreP[0] > conformP)
-                                    countP++;
-                            }
-                            if (val == 0) {
-                                double conformN = 0;//TODO
-                                countNN++;
-                                if (scoreN[0] > conformN)
-                                    countN++;
-                            }
-                        }
-                        double pp = countP / countPN;
-                        double pn = countN / countNN;
-
-                        /*int indC = classIndex;
-                        ArrayList<Instance> match = scoreP[2] == 0 ? mappedInsts.first() : mappedInsts.second();
-                        var t = match.stream().map(i->this.scoreFor(i, indC, classAttribute, scoreP[2])).toList();
-                        var cou = match.stream().filter(i->scoreP[0] >= this.scoreFor(i, indC, classAttribute, scoreP[2])[0]).count();
-                        double pp = (double) mappedInsts.second().stream().filter(i->scoreP[0] >= this.scoreFor(i, indC, classAttribute, scoreP[2])[0]).count() / mappedInsts.second().size();
-                        double pn = (double) mappedInsts.first().stream().filter(i->scoreN[0] >= this.scoreFor(i, indC, classAttribute, scoreN[2])[0]).count() / mappedInsts.first().size();
-                        */
-                    double[] scoreN = this.plausibility(this.training[labelIndex], inst, List.of(), labelIndex, classAttribute);
+                    double[] scoreN = this.plausibility(this.training[labelIndex], inst, List.of(this.ruleStats[labelIndex]), labelIndex, classAttribute);
                     pos.add(scoreN[1]);
                     neg.add(scoreN[0]);
                     if (scoreN[1] >= this.threshold * scoreN[0]) {
@@ -435,51 +342,16 @@ public class RuleMultiLabelLearner implements Learner {
                         Rule rule = this.rules[labelIndex][i];
                         if (rule.covers(inst)) {
                             distribution = this.distributions[labelIndex][i];
-                            if (distribution[1] >= this.threshold * distribution[0])
+                            if (distribution[1] >= distribution[0])
                                 result.computeIfAbsent(instInd, o -> new ArrayList<>()).add(label);
                             break;
                         }
                     }
                 }
             }
-            System.out.println();
         }
         return new Output(data, this.labels, result, true);
     }
-
-    /*private double[] scoreFor(Instance instance, int classIndex, Attribute classAtt, double match) {
-        double scoreC = 0;
-        double ruleID = 0;
-        double val = match;
-        int offsetP = 0;
-        int offsetN = 0;
-        for (int i = 0; i < this.rules[classIndex].length; ++i) {
-            Rule rule = this.rules[classIndex][i];
-            double[] ruleData = this.ruleData[classIndex][i];
-            double score;
-            if (ruleData[0] == 0) {
-                score = this.ruleScores2[classIndex][0][i - offsetN];
-                offsetP++;
-            } else {
-                score = this.ruleScores2[classIndex][1][i - offsetP];
-                offsetN++;
-            }
-            double att = Double.parseDouble(classAtt.value((int) rule.getConsequent()));
-            if (rule.covers(instance) && (match == -1 || att == match)) {// && score > (1-this.pConfidence)) {
-                scoreC = score;
-                ruleID = i;
-                val = Double.parseDouble(classAtt.value((int) rule.getConsequent()));
-                                /*distribution = this.distributions[classIndex][i];
-                                if (distribution[1] >= distribution[0]) {
-                                    result.computeIfAbsent(instInd, o -> new ArrayList<>()).add(label);
-                                    p++;
-                                }
-                                break;
-                break;
-            }
-        }
-        return new double[]{scoreC, ruleID, val};
-    }*/
 
     public String getRules() {
         return Arrays.deepToString(this.classifiers);

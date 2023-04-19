@@ -41,6 +41,7 @@ public class MultiLabelClassifier {
         options.addOption("log", false, "Logging things. WIP");
         options.addOption("t", true, "threshold");
         options.addOption("nopruning", false, "Disable JRIP pruning");
+        options.addOption("hold", true, "Use x-hold dataset as test");
 
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
@@ -53,11 +54,11 @@ public class MultiLabelClassifier {
             System.exit(1);
         }
 
-        String filePath = cmd.getOptionValue("-f");
-        String xml = cmd.getOptionValue("-xml");
+        String filePath = cmd.getOptionValue("f");
+        String xml = cmd.getOptionValue("xml");
         LabelledSet set;
         if (xml == null) {
-            String labelString = cmd.getOptionValue("-label");
+            String labelString = cmd.getOptionValue("label");
             if (labelString == null) {
                 formatter.printHelp("utility-name", options);
                 throw new RuntimeException("Neither xml nor label count specified");
@@ -70,17 +71,25 @@ public class MultiLabelClassifier {
             System.out.printf("Using dataset %s with label file %s%n", filePath, xml);
         else
             System.out.printf("Using dataset %s with label file %s%n", filePath, cmd.getOptionValue("-label"));
-        String testFile = cmd.getOptionValue("-test");
 
-        UnlabelledSet test = new UnlabelledSet(new Instances(set.insts, 400, set.insts.size() - 400));//testFile == null ? new UnlabelledSet(set.insts) : new UnlabelledSet(Path.of(testFile));
-        String classifier = cmd.getOptionValue("-c", "RMLC");
+        String testFile = cmd.getOptionValue("test");
+        int hold = Math.max(1, Integer.parseInt(cmd.getOptionValue("hold", "10")));
+        UnlabelledSet test;
+        if (testFile != null) {
+            test = new UnlabelledSet(Path.of(testFile));
+        } else {
+            int split = set.insts.size() - set.insts.size() / hold;
+            test = new UnlabelledSet(new Instances(set.insts, split, set.insts.size() - split));
+            set = new LabelledSet(new Instances(set.insts, 0, split), set.labels);
+        }
+        String classifier = cmd.getOptionValue("c", "RMLC");
 
         Settings settings = new Settings();
 
-        if (cmd.hasOption("-nonconformal"))
+        if (cmd.hasOption("nonconformal"))
             settings.withoutConformal();
 
-        if (cmd.hasOption("-log"))
+        if (cmd.hasOption("log"))
             settings.log();
 
         if (cmd.hasOption("t")) {
@@ -106,7 +115,7 @@ public class MultiLabelClassifier {
             System.out.println(((RuleMultiLabelLearner) learner).getRules());
         if (plot) {
             ArrayList<Pair<Double, Output>> res = new ArrayList<>();
-            for (double d = 0; d < 1; d += 0.025) {
+            for (double d = 0; d < 1.5; d += 0.1) {
                 ((RuleMultiLabelLearner) learner).setThreshold(d); //Currently only this impl so its fine
                 Output o = learner.predict(test);
                 res.add(new Pair<>(d, o));
