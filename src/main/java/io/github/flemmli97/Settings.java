@@ -12,6 +12,7 @@ public class Settings {
 
     public boolean conformal = true;
     public boolean log;
+    public boolean pruning = true;
 
     public Settings withMaxRules(int maxRules) {
         this.maxRules = maxRules;
@@ -35,6 +36,11 @@ public class Settings {
 
     public Settings log() {
         this.log = true;
+        return this;
+    }
+
+    public Settings disablePruning() {
+        this.pruning = false;
         return this;
     }
 }

@@ -18,6 +18,7 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import weka.classifiers.rules.DecisionTable;
 import weka.core.Instance;
+import weka.core.Instances;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -39,6 +40,7 @@ public class MultiLabelClassifier {
         options.addOption("nonconformal", false, "Disable conformal prediction");
         options.addOption("log", false, "Logging things. WIP");
         options.addOption("t", true, "threshold");
+        options.addOption("nopruning", false, "Disable JRIP pruning");
 
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
@@ -70,7 +72,7 @@ public class MultiLabelClassifier {
             System.out.printf("Using dataset %s with label file %s%n", filePath, cmd.getOptionValue("-label"));
         String testFile = cmd.getOptionValue("-test");
 
-        UnlabelledSet test = testFile == null ? new UnlabelledSet(set.insts) : new UnlabelledSet(Path.of(testFile));
+        UnlabelledSet test = new UnlabelledSet(new Instances(set.insts, 400, set.insts.size() - 400));//testFile == null ? new UnlabelledSet(set.insts) : new UnlabelledSet(Path.of(testFile));
         String classifier = cmd.getOptionValue("-c", "RMLC");
 
         Settings settings = new Settings();
@@ -83,6 +85,10 @@ public class MultiLabelClassifier {
 
         if (cmd.hasOption("t")) {
             settings.withConfidenceP(Float.parseFloat(cmd.getOptionValue("t")));
+        }
+
+        if (cmd.hasOption("nopruning")) {
+            settings.disablePruning();
         }
 
         runLearner(classifier, settings, set, test, cmd.hasOption("-rules"), cmd.hasOption("-plot"));
@@ -100,7 +106,7 @@ public class MultiLabelClassifier {
             System.out.println(((RuleMultiLabelLearner) learner).getRules());
         if (plot) {
             ArrayList<Pair<Double, Output>> res = new ArrayList<>();
-            for (double d = 0; d < 1.5; d += 0.025) {
+            for (double d = 0; d < 1; d += 0.025) {
                 ((RuleMultiLabelLearner) learner).setThreshold(d); //Currently only this impl so its fine
                 Output o = learner.predict(test);
                 res.add(new Pair<>(d, o));
@@ -122,6 +128,8 @@ public class MultiLabelClassifier {
             System.out.println("MCC: " + o.confusionMatrix.MCC());
             System.out.println("Hamming Loss: " + o.hammingLoss());
             System.out.println("AMOUT: " + (o.dataSet.insts.size() * o.labels.length));
+            System.out.println("True Pos: " + o.confusionMatrix.getTruePositive());
+            System.out.println("True NEG: " + o.confusionMatrix.getTrueNegative());
             System.out.println("FALSE Pos: " + o.confusionMatrix.getFalsePositive());
             System.out.println("FALSE NEG: " + o.confusionMatrix.getFalseNegative());
             //System.out.println("=======Labels: ");
