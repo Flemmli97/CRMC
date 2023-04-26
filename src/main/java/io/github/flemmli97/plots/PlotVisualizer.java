@@ -54,6 +54,6 @@ public class PlotVisualizer {
     }
 
     public static void plotF1(ArrayList<Pair<Double, Output>> outputs) {
-        plot(outputs, "F1-Measure", "F1-Measure", o -> o.confusionMatrix.macroF1());
+        plot(outputs, "F1-Measure", "F1-Measure", o -> o.confusionMatrix.f1());
     }
 }

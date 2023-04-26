@@ -119,8 +119,6 @@ public class MultiLabelClassifier {
                 ((RuleMultiLabelLearner) learner).setThreshold(d); //Currently only this impl so its fine
                 Output o = learner.predict(test);
                 res.add(new Pair<>(d, o));
-                System.out.println("FALSE Loss: " + o.confusionMatrix.getFalsePositive());
-                System.out.println("FALSE NEG: " + o.confusionMatrix.getFalseNegative());
             }
             PlotVisualizer.plotF1(res);
             PlotVisualizer.plot(res, "Hamming-Loss", "Hamming-Loss", Output::hammingLoss);
