@@ -28,6 +28,8 @@ import java.util.Map;
 
 public class MultiLabelClassifier {
 
+    public static boolean LOG = true;
+
     public static void main(String[] args) {
         Options options = new Options();
         options.addOption("f", true, "File path");
@@ -49,7 +51,7 @@ public class MultiLabelClassifier {
         try {
             cmd = parser.parse(options, args);
         } catch (ParseException e) {
-            System.out.println(e.getMessage());
+            log(e.getMessage());
             formatter.printHelp("java -jar <jar>", options);
             System.exit(1);
         }
@@ -68,9 +70,9 @@ public class MultiLabelClassifier {
             set = new LabelledSet(Path.of(filePath), Path.of(xml));
         }
         if (xml != null)
-            System.out.printf("Using dataset %s with label file %s%n", filePath, xml);
+            log("Using dataset %s with label file %s%n", filePath, xml);
         else
-            System.out.printf("Using dataset %s with label file %s%n", filePath, cmd.getOptionValue("-label"));
+            log("Using dataset %s with label file %s%n", filePath, cmd.getOptionValue("-label"));
 
         String testFile = cmd.getOptionValue("test");
         int hold = Math.max(1, Integer.parseInt(cmd.getOptionValue("hold", "10")));
@@ -100,19 +102,21 @@ public class MultiLabelClassifier {
             settings.disablePruning();
         }
 
-        runLearner(classifier, settings, set, test, cmd.hasOption("-rules"), cmd.hasOption("-plot"));
+        runLearner(classifier, settings, set, test, cmd.hasOption("-rules"), cmd.hasOption("-plot"), null);
     }
 
-    private static void runLearner(String classifier, Settings settings, LabelledSet set, UnlabelledSet test, boolean rules, boolean plot) {
+    public static void runLearner(String classifier, Settings settings, LabelledSet set, UnlabelledSet test, boolean rules, boolean plot, List<Pair<Long, Long>> timings) {
         Learner learner = Learners.getLearner(classifier)
                 .orElseThrow(() -> new RuntimeException("No such learner " + classifier))
                 .apply(settings);
-        System.out.println("Learning...");
+        log("Learning...");
         long time = System.nanoTime();
         learner.learn(set);
-        System.out.println("Learning took " + (System.nanoTime() - time) + " ns");
+        long learnTime = (System.nanoTime() - time);
+        log("Learning took " + learnTime + " ns");
         if (rules)
-            System.out.println(((RuleMultiLabelLearner) learner).getRules());
+            log(((RuleMultiLabelLearner) learner).getRules());
+        time = System.nanoTime();
         if (plot) {
             ArrayList<Pair<Double, Output>> res = new ArrayList<>();
             for (double d = 0; d < 1.5; d += 0.1) {
@@ -124,34 +128,37 @@ public class MultiLabelClassifier {
             PlotVisualizer.plot(res, "Hamming-Loss", "Hamming-Loss", Output::hammingLoss);
         } else {
             Output o = learner.predict(test);
-            System.out.println("Micro Accuracy: " + o.confusionMatrix.accuracy());
-            System.out.println("Macro Accuracy: " + o.confusionMatrix.macroAccuracy());
-            System.out.println("Precision: " + o.confusionMatrix.precision());
-            System.out.println("Macro Precision: " + o.confusionMatrix.macroPrecision());
-            System.out.println("Recall: " + o.confusionMatrix.recall());
-            System.out.println("Macro Recall: " + o.confusionMatrix.macroRecall());
-            System.out.println("F1: " + o.confusionMatrix.f1());
-            System.out.println("Macro F1: " + o.confusionMatrix.macroF1());
-            System.out.println("MCC: " + o.confusionMatrix.MCC());
-            System.out.println("Hamming Loss: " + o.hammingLoss());
-            System.out.println("AMOUT: " + (o.dataSet.insts.size() * o.labels.length));
-            System.out.println("True Pos: " + o.confusionMatrix.getTruePositive());
-            System.out.println("True NEG: " + o.confusionMatrix.getTrueNegative());
-            System.out.println("FALSE Pos: " + o.confusionMatrix.getFalsePositive());
-            System.out.println("FALSE NEG: " + o.confusionMatrix.getFalseNegative());
-            //System.out.println("=======Labels: ");
+            log("Micro Accuracy: " + o.confusionMatrix.accuracy());
+            log("Macro Accuracy: " + o.confusionMatrix.macroAccuracy());
+            log("Precision: " + o.confusionMatrix.precision());
+            log("Macro Precision: " + o.confusionMatrix.macroPrecision());
+            log("Recall: " + o.confusionMatrix.recall());
+            log("Macro Recall: " + o.confusionMatrix.macroRecall());
+            log("F1: " + o.confusionMatrix.f1());
+            log("Macro F1: " + o.confusionMatrix.macroF1());
+            log("MCC: " + o.confusionMatrix.MCC());
+            log("Hamming Loss: " + o.hammingLoss());
+            log("AMOUT: " + (o.dataSet.insts.size() * o.labels.length));
+            log("True Pos: " + o.confusionMatrix.getTruePositive());
+            log("True NEG: " + o.confusionMatrix.getTrueNegative());
+            log("FALSE Pos: " + o.confusionMatrix.getFalsePositive());
+            log("FALSE NEG: " + o.confusionMatrix.getFalseNegative());
+            //log("=======Labels: ");
             //for(Pair<Integer, List<String>> val : o.instanceLabelsReadable)
-            //    System.out.println(val);
+            //    log(val);
         }
+        long predictTime = (System.nanoTime() - time);
+        if (timings != null)
+            timings.add(new Pair<>(learnTime, predictTime));
     }
 
     private static void binaryRelevanceMulanTest(LabelledSet set, String file, String xml) {
-        System.out.println("Running mulan binary relevance");
+        log("Running mulan binary relevance");
         long time = System.nanoTime();
         BinaryRelevance r = new BinaryRelevance(new DecisionTable());
         try {
             r.build(new MultiLabelInstances(file, xml));
-            System.out.println("Learning took " + (System.nanoTime() - time) + " ns");
+            log("Learning took " + (System.nanoTime() - time) + " ns");
             MultiLabelInstances mI = new MultiLabelInstances("./data/CAL500.arff", "./data/CAL500.xml");
             Map<Integer, List<Integer>> result = new HashMap<>();
             int i = 0;
@@ -168,14 +175,23 @@ public class MultiLabelClassifier {
                 i++;
             }
             Output out = new Output(new UnlabelledSet(mI.getDataSet()), set.labels, result, true);
-            System.out.println("=======");
-            System.out.println(out.confusionMatrix.accuracy());
-            System.out.println(out.confusionMatrix.precision());
-            System.out.println(out.confusionMatrix.recall());
-            System.out.println(out.confusionMatrix.f1());
-            System.out.println(out.confusionMatrix.MCC());
+            log("=======");
+            log(out.confusionMatrix.accuracy());
+            log(out.confusionMatrix.precision());
+            log(out.confusionMatrix.recall());
+            log(out.confusionMatrix.f1());
+            log(out.confusionMatrix.MCC());
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    public static void log(Object msg, Object... obj) {
+        if (LOG) {
+            if (obj.length == 0)
+                System.out.println(msg);
+            else
+                System.out.printf(msg.toString(), obj);
         }
     }
 }

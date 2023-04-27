@@ -1,5 +1,6 @@
 package io.github.flemmli97.learner;
 
+import io.github.flemmli97.MultiLabelClassifier;
 import io.github.flemmli97.Pair;
 import io.github.flemmli97.Settings;
 import io.github.flemmli97.dataset.LabelledSet;
@@ -195,7 +196,7 @@ public class RuleMultiLabelLearner implements Learner {
                         p -> new double[][]{p.first().stream().mapToDouble(f -> f).toArray(), p.second().stream().mapToDouble(f -> f).toArray()}));
                 */
                 if (this.log)
-                    System.out.println("Rule-scores " + Arrays.toString(this.ruleStats[labelIndex]));
+                    MultiLabelClassifier.log("Rule-scores " + Arrays.toString(this.ruleStats[labelIndex]));
             }
         }
         this.learned = true;

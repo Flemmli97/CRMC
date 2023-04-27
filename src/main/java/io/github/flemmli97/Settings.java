@@ -8,7 +8,7 @@ public class Settings {
     public int maxRules;
 
     public int threadCount = 1;
-    public double confidenceP = 0.6;
+    public double confidenceP = 0.5;
 
     public boolean conformal = true;
     public boolean log;
