@@ -38,6 +38,10 @@ tasks.named('shadowJar', ShadowJar) {
     configurations = [project.configurations.shadow]
     archiveClassifier.set("")
     exclude 'META-INF/**'
+    from (project.projectDir) {
+        include 'LICENSE'
+        into "META-INF"
+    }
     dependsOn jar
 }
 
