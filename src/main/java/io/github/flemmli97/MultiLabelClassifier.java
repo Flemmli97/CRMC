@@ -34,7 +34,7 @@ public class MultiLabelClassifier {
         Options options = new Options();
         options.addOption("f", true, "File path");
         options.addOption("xml", true, "XML path");
-        options.addOption("label", true, "File path");
+        options.addOption("label", true, "Amount of attributes that are labels");
         options.addOption("c", true, "The classifier implementation. Currently only RMLC");
         options.addOption("test", true, "The test file");
         options.addOption("plot", false, "If set runs using thresholds 0-1 and creates a plot using that");
