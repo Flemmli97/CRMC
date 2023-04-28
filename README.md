@@ -1,8 +1,8 @@
 # CRMC
-An efficient implementation on Conformal Rule-Based Multi-label Classification
+An implementation off a Conformal Rule-Based Multi-label Classification using binary relevance with JRIP.
 
 # Setup
-Make sure you have python 3 and pip installed.
-Then simply run `pip install -r requirements.txt` from the directory
+To run it make sure you have java installed and then simply do
+`java -jar --path-to-jar -h` to view all possible args
 
 

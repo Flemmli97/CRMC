@@ -44,6 +44,7 @@ public class MultiLabelClassifier {
         options.addOption("t", true, "threshold");
         options.addOption("nopruning", false, "Disable JRIP pruning");
         options.addOption("hold", true, "Use x-hold dataset as test");
+        options.addOption("h", false, "Show this help message");
 
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
@@ -52,6 +53,11 @@ public class MultiLabelClassifier {
             cmd = parser.parse(options, args);
         } catch (ParseException e) {
             log(e.getMessage());
+            formatter.printHelp("java -jar <jar>", options);
+            System.exit(1);
+        }
+
+        if (cmd.hasOption("h")) {
             formatter.printHelp("java -jar <jar>", options);
             System.exit(1);
         }
