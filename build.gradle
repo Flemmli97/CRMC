@@ -3,9 +3,9 @@ plugins {
     id "com.github.johnrengelman.shadow" version "8.1.1"
 }
 
-version = 1.0
+version = 0.1
 group = "io.github.flemmli97"
-// archivesBaseName = "temp"
+archivesBaseName = "CRMC"
 
 tasks.withType(JavaCompile) {
     options.encoding = "UTF-8"
@@ -37,6 +37,7 @@ import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 tasks.named('shadowJar', ShadowJar) {
     configurations = [project.configurations.shadow]
     archiveClassifier.set("")
+    exclude 'META-INF/**'
     dependsOn jar
 }
 
@@ -44,10 +45,10 @@ jar {
     manifest {
         attributes([
                 "Main-Class": 'io.github.flemmli97.MultiLabelClassifier',
-                "Specification-Title"     : name,
+                "Specification-Title"     : archivesBaseName,
                 "Specification-Vendor"    : "flemmli97",
                 "Specification-Version"   : "1",
-                "Implementation-Title"    : name,
+                "Implementation-Title"    : archivesBaseName,
                 "Implementation-Version"  : version,
                 "Implementation-Vendor"   : "flemmli97",
                 "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
