@@ -7,6 +7,7 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 import weka.core.Attribute;
 import weka.core.Instance;
+import weka.core.Instances;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -46,6 +47,12 @@ public class LabelledSet extends UnlabelledSet {
     //public Map<Feature,List of pair:data instance, feature val>
 
     public Set<Attribute>[] dataFeaturess;
+
+    public LabelledSet(Instances instances, int[] labels) {
+        super(instances);
+        this.labels = labels;
+        this.setupLabels();
+    }
 
     /**
      * Creates a new labelled dataset from a given path

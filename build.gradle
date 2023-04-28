@@ -1,11 +1,11 @@
 plugins {
     id 'application'
+    id "com.github.johnrengelman.shadow" version "8.1.1"
 }
 
-version = 1.0
-// group = "io.github.flemmli97"
-// archivesBaseName = "temp"
-
+version = 0.1
+group = "io.github.flemmli97"
+archivesBaseName = "CRMC"
 
 tasks.withType(JavaCompile) {
     options.encoding = "UTF-8"
@@ -13,7 +13,6 @@ tasks.withType(JavaCompile) {
 }
 
 application {
-    // Define the main class for the application.
     mainClass = 'io.github.flemmli97.MultiLabelClassifier'
 }
 
@@ -24,21 +23,32 @@ repositories {
 dependencies {
     testImplementation 'junit:junit:4.13.2'
 
-    implementation 'net.sf.meka.thirdparty:mulan:1.4.0'
-    implementation 'it.unimi.dsi:fastutil:8.5.11'
-    implementation 'commons-cli:commons-cli:1.5.0'
-    //implementation 'nz.ac.waikato.cms.weka:3.8.0'
-    //implementation 'com.google.code.gson:gson:2.10'
+    configurations.implementation.extendsFrom(configurations.shadow)
+
+    shadow 'net.sf.meka.thirdparty:mulan:1.4.0'
+    shadow 'it.unimi.dsi:fastutil:8.5.11'
+    shadow 'commons-cli:commons-cli:1.5.0'
+    shadow 'com.github.sh0nk:matplotlib4j:0.5.0'
+    shadow group: 'nz.ac.waikato.cms.weka', name: 'weka-stable', version: '3.8.6'
 }
 
-//Optional
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
+tasks.named('shadowJar', ShadowJar) {
+    configurations = [project.configurations.shadow]
+    archiveClassifier.set("")
+    exclude 'META-INF/**'
+    dependsOn jar
+}
+
 jar {
     manifest {
         attributes([
-                "Specification-Title"     : name,
+                "Main-Class": 'io.github.flemmli97.MultiLabelClassifier',
+                "Specification-Title"     : archivesBaseName,
                 "Specification-Vendor"    : "flemmli97",
                 "Specification-Version"   : "1",
-                "Implementation-Title"    : name,
+                "Implementation-Title"    : archivesBaseName,
                 "Implementation-Version"  : version,
                 "Implementation-Vendor"   : "flemmli97",
                 "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
