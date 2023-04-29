@@ -6,6 +6,7 @@ import io.github.flemmli97.Settings;
 import io.github.flemmli97.dataset.LabelledSet;
 import io.github.flemmli97.dataset.Output;
 import io.github.flemmli97.dataset.UnlabelledSet;
+import io.github.flemmli97.plots.PlotVisualizer;
 import io.github.flemmli97.reflection.ReflectionUtil;
 import weka.classifiers.Classifier;
 import weka.classifiers.rules.JRip;
@@ -28,6 +29,8 @@ import java.util.Map;
  * Implementation of a BinaryRelevance classifier using wekas implementation of RIPPER {@link JRip}
  */
 public class RuleMultiLabelLearner implements Learner {
+
+    private static boolean plotConforms = false;
 
     private final int threadCount;
     private double threshold;
@@ -301,14 +304,14 @@ public class RuleMultiLabelLearner implements Learner {
                 mP.stream().mapToDouble(d -> d).limit(mP.size() / 2).max().orElse(0)};
     }
 
-    private double[] plausibility(Instances instances, Instance instance, List<RuleStats> stats, int labelIndex, Attribute label) {
+    private double[][] plausibility(Instances instances, Instance instance, List<RuleStats> stats, int labelIndex, Attribute label) {
         double[] conform = this.conformity(instances, instance, stats, labelIndex);
         double[][] instsScores = this.instanceScores[labelIndex];
         double cP = Arrays.stream(instsScores[1]).filter(d -> conform[1] >= d).count();
         double cN = Arrays.stream(instsScores[0]).filter(d -> conform[0] >= d).count();
         double pPos = cP / (double) instsScores[1].length;
         double pNeg = cN / (double) instsScores[0].length;
-        return new double[]{pNeg, pPos};
+        return new double[][]{conform, new double[]{pNeg, pPos}};
     }
 
     @Override
@@ -326,16 +329,23 @@ public class RuleMultiLabelLearner implements Learner {
                 e.printStackTrace();
             }
             Attribute classAttribute = ReflectionUtil.getField(this.classifiers[labelIndex], "m_Class");
-            List<Double> pos = new ArrayList<>();
-            List<Double> neg = new ArrayList<>();
+            List<double[]> pos = new ArrayList<>();
+            List<double[]> neg = new ArrayList<>();
+            List<double[]> posPlaus = new ArrayList<>();
+            List<double[]> negPlaus = new ArrayList<>();
             for (int instInd = 0; instInd < instances.size(); instInd++) {
                 Instance inst = instances.get(instInd);
                 double[] distribution;
                 if (this.applyConformal) {
-                    double[] scoreN = this.plausibility(this.training[labelIndex], inst, List.of(this.ruleStats[labelIndex]), labelIndex, classAttribute);
-                    pos.add(scoreN[1]);
-                    neg.add(scoreN[0]);
-                    if (scoreN[1] >= this.threshold * scoreN[0]) {
+                    double[][] vals = this.plausibility(this.training[labelIndex], inst, List.of(this.ruleStats[labelIndex]), labelIndex, classAttribute);
+                    if (inst.classValue() == 1) {
+                        pos.add(vals[0]);
+                        posPlaus.add(vals[1]);
+                    } else {
+                        neg.add(vals[0]);
+                        negPlaus.add(vals[1]);
+                    }
+                    if (vals[1][1] >= this.threshold * vals[1][0]) {
                         result.computeIfAbsent(instInd, o -> new ArrayList<>()).add(label);
                     }
                 } else {
@@ -349,6 +359,21 @@ public class RuleMultiLabelLearner implements Learner {
                         }
                     }
                 }
+            }
+            if (plotConforms) {
+                plotConforms = false;
+                PlotVisualizer.plot("Conformity", "conformity positive", "conformity negative", p->{
+                    p.plot().add(pos.stream().map(v->v[1]).toList(), pos.stream().map(v->v[0]).toList(), "o")
+                            .color("red");
+                    p.plot().add(neg.stream().map(v->v[1]).toList(), neg.stream().map(v->v[0]).toList(), "o")
+                            .color("blue");
+                        });
+                PlotVisualizer.plot("Plausibility", "plausibility positive", "plausibility negative", p->{
+                    p.plot().add(posPlaus.stream().map(v->v[1]).toList(), posPlaus.stream().map(v->v[0]).toList(), "o")
+                            .color("red");
+                    p.plot().add(negPlaus.stream().map(v->v[1]).toList(), negPlaus.stream().map(v->v[0]).toList(), "o")
+                            .color("blue");
+                });
             }
         }
         return new Output(data, this.labels, result, true);

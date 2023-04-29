@@ -12,6 +12,10 @@ tasks.withType(JavaCompile) {
     options.release = 17
 }
 
+test {
+    jvmArgs '-Xmx4G'
+}
+
 application {
     mainClass = 'io.github.flemmli97.MultiLabelClassifier'
 }
