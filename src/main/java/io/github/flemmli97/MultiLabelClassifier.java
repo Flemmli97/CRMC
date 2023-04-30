@@ -20,8 +20,13 @@ import weka.classifiers.rules.DecisionTable;
 import weka.core.Instance;
 import weka.core.Instances;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +50,7 @@ public class MultiLabelClassifier {
         options.addOption("nopruning", false, "Disable JRIP pruning");
         options.addOption("hold", true, "Use x-hold dataset as test");
         options.addOption("h", false, "Show this help message");
+        options.addOption("o", true, "Specify the output file where the predicted labels will be saved");
 
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
@@ -108,10 +114,13 @@ public class MultiLabelClassifier {
             settings.disablePruning();
         }
 
-        runLearner(classifier, settings, set, test, cmd.hasOption("-rules"), cmd.hasOption("-plot"), null);
+        String output = cmd.getOptionValue("o");
+
+
+        runLearner(classifier, settings, set, test, cmd.hasOption("-rules"), cmd.hasOption("-plot"), null, output);
     }
 
-    public static void runLearner(String classifier, Settings settings, LabelledSet set, UnlabelledSet test, boolean rules, boolean plot, List<Pair<Long, Long>> timings) {
+    public static void runLearner(String classifier, Settings settings, LabelledSet set, UnlabelledSet test, boolean rules, boolean plot, List<Pair<Long, Long>> timings, String output) {
         Learner learner = Learners.getLearner(classifier)
                 .orElseThrow(() -> new RuntimeException("No such learner " + classifier))
                 .apply(settings);
@@ -123,6 +132,7 @@ public class MultiLabelClassifier {
         if (rules)
             log(((RuleMultiLabelLearner) learner).getRules());
         time = System.nanoTime();
+        Output out = null;
         if (plot) {
             ArrayList<Pair<Double, Output>> res = new ArrayList<>();
             for (double d = 0; d < 1.5; d += 0.1) {
@@ -133,22 +143,22 @@ public class MultiLabelClassifier {
             PlotVisualizer.plotF1(res);
             PlotVisualizer.plot(res, "Hamming-Loss", "Hamming-Loss", Output::hammingLoss);
         } else {
-            Output o = learner.predict(test);
-            log("Micro Accuracy: " + o.confusionMatrix.accuracy());
-            log("Macro Accuracy: " + o.confusionMatrix.macroAccuracy());
-            log("Precision: " + o.confusionMatrix.precision());
-            log("Macro Precision: " + o.confusionMatrix.macroPrecision());
-            log("Recall: " + o.confusionMatrix.recall());
-            log("Macro Recall: " + o.confusionMatrix.macroRecall());
-            log("F1: " + o.confusionMatrix.f1());
-            log("Macro F1: " + o.confusionMatrix.macroF1());
-            log("MCC: " + o.confusionMatrix.MCC());
-            log("Hamming Loss: " + o.hammingLoss());
-            log("AMOUT: " + (o.dataSet.insts.size() * o.labels.length));
-            log("True Pos: " + o.confusionMatrix.getTruePositive());
-            log("True NEG: " + o.confusionMatrix.getTrueNegative());
-            log("FALSE Pos: " + o.confusionMatrix.getFalsePositive());
-            log("FALSE NEG: " + o.confusionMatrix.getFalseNegative());
+            out = learner.predict(test);
+            log("Micro Accuracy: " + out.confusionMatrix.accuracy());
+            log("Macro Accuracy: " + out.confusionMatrix.macroAccuracy());
+            log("Precision: " + out.confusionMatrix.precision());
+            log("Macro Precision: " + out.confusionMatrix.macroPrecision());
+            log("Recall: " + out.confusionMatrix.recall());
+            log("Macro Recall: " + out.confusionMatrix.macroRecall());
+            log("F1: " + out.confusionMatrix.f1());
+            log("Macro F1: " + out.confusionMatrix.macroF1());
+            log("MCC: " + out.confusionMatrix.MCC());
+            log("Hamming Loss: " + out.hammingLoss());
+            log("AMOUT: " + (out.dataSet.insts.size() * out.labels.length));
+            log("True Pos: " + out.confusionMatrix.getTruePositive());
+            log("True NEG: " + out.confusionMatrix.getTrueNegative());
+            log("FALSE Pos: " + out.confusionMatrix.getFalsePositive());
+            log("FALSE NEG: " + out.confusionMatrix.getFalseNegative());
             //log("=======Labels: ");
             //for(Pair<Integer, List<String>> val : o.instanceLabelsReadable)
             //    log(val);
@@ -156,6 +166,24 @@ public class MultiLabelClassifier {
         long predictTime = (System.nanoTime() - time);
         if (timings != null)
             timings.add(new Pair<>(learnTime, predictTime));
+        if (out != null && output != null) {
+            File file = Path.of(output).toFile();
+            try {
+                if (!file.exists()) {
+                    file.getParentFile().mkdirs();
+                    file.createNewFile();
+                }
+                BufferedWriter outputStream = new BufferedWriter(new FileWriter(file));
+                List<Pair<Integer, List<String>>> result = out.instanceLabelsReadable.stream().sorted(Comparator.comparing(Pair::first)).toList();
+                for (Pair<Integer, List<String>> p : result) {
+                    outputStream.write(p.second().toString().replace("[", "").replace("]", ""));
+                    outputStream.write("\n");
+                }
+                outputStream.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     private static void binaryRelevanceMulanTest(LabelledSet set, String file, String xml) {

@@ -362,16 +362,16 @@ public class RuleMultiLabelLearner implements Learner {
             }
             if (plotConforms) {
                 plotConforms = false;
-                PlotVisualizer.plot("Conformity", "conformity positive", "conformity negative", p->{
-                    p.plot().add(pos.stream().map(v->v[1]).toList(), pos.stream().map(v->v[0]).toList(), "o")
+                PlotVisualizer.plot("Conformity", "conformity positive", "conformity negative", p -> {
+                    p.plot().add(pos.stream().map(v -> v[1]).toList(), pos.stream().map(v -> v[0]).toList(), "o")
                             .color("red");
-                    p.plot().add(neg.stream().map(v->v[1]).toList(), neg.stream().map(v->v[0]).toList(), "o")
+                    p.plot().add(neg.stream().map(v -> v[1]).toList(), neg.stream().map(v -> v[0]).toList(), "o")
                             .color("blue");
-                        });
-                PlotVisualizer.plot("Plausibility", "plausibility positive", "plausibility negative", p->{
-                    p.plot().add(posPlaus.stream().map(v->v[1]).toList(), posPlaus.stream().map(v->v[0]).toList(), "o")
+                });
+                PlotVisualizer.plot("Plausibility", "plausibility positive", "plausibility negative", p -> {
+                    p.plot().add(posPlaus.stream().map(v -> v[1]).toList(), posPlaus.stream().map(v -> v[0]).toList(), "o")
                             .color("red");
-                    p.plot().add(negPlaus.stream().map(v->v[1]).toList(), negPlaus.stream().map(v->v[0]).toList(), "o")
+                    p.plot().add(negPlaus.stream().map(v -> v[1]).toList(), negPlaus.stream().map(v -> v[0]).toList(), "o")
                             .color("blue");
                 });
             }
